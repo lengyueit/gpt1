@@ -8,6 +8,3 @@ top_k = 5
 decoder_layer_num = 12
 hidden_state = 768
 
-import torch
-
-device = "cuda:0" if torch.cuda.is_available() else "cpu"

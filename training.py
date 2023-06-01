@@ -6,6 +6,9 @@ from config import *
 from tqdm import tqdm
 import torch.nn as nn
 
+import argparse
+import torch.distributed as dist
+
 
 def read_data(path, num=None):
     with open(path, encoding="utf8") as f:
@@ -66,24 +69,48 @@ class MyDataset(Dataset):
 
 
 if __name__ == '__main__':
+    # 参数设置
+    parser = argparse.ArgumentParser(description='this is a gpt trainer')
+    parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', -1), type=int)
+    args = parser.parse_args()
+
+    # 分布式初始化
+    if args.local_rank != -1:
+        torch.cuda.set_device(args.local_rank)
+        device = torch.device("cuda", args.local_rank)
+        torch.distributed.init_process_group(backend="nccl", init_method='env://')
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+
+    # cuda num
+    cuda_num = torch.cuda.device_count()
+    print("cuda num: {}".format(cuda_num))
+
     # 加载数据
     all_data = read_data(os.path.join("data", "train.txt"), training_text_num)
     index_2_word, word_2_index = get_word_2_index(os.path.join("data", "vocab.txt"))
     vocab_len = len(index_2_word)
-
     train_dataset = MyDataset(all_data, word_2_index)
-    train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False, collate_fn=train_dataset.pro_data)
+
+    # 分布式处理数据
+    if args.local_rank != -1:
+        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
+        train_dataloader = DataLoader(train_dataset, batch_size, sampler=train_sampler, shuffle=False,
+                                      collate_fn=train_dataset.pro_data)
+    else:
+        train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False,
+                                      collate_fn=train_dataset.pro_data)
 
     # model
     model = GPT_Model(vocab_len)
+    # if cuda_num > 1:
+    #     model = nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
+    #                                                 output_device=args.local_rank)
 
-    cuda_num = torch.cuda.device_count()
-    print("cuda num: {}".format(cuda_num))
+    # todo data parallel
     if cuda_num > 1:
-        """data parallel"""
-        # model = nn.DataParallel(model, device_ids=[0, 1], output_device=0)
         model = nn.DataParallel(model)
-
     model = model.to(device)
 
     # 计算模型参数
@@ -95,7 +122,9 @@ if __name__ == '__main__':
 
     model.train()
     for i in range(epoch):
-        # break
+        # if cuda_num > 1:
+        #     train_sampler.set_epoch(epoch)  # shuffle
+
         for inputs, outputs in tqdm(train_dataloader):
             inputs = inputs.to(device)
             outputs = outputs.to(device)
