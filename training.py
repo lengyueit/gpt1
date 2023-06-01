@@ -4,6 +4,7 @@ import torch
 from model_gpt import GPT_Model
 from config import *
 from tqdm import tqdm
+import torch.nn as nn
 
 
 def read_data(path, num=None):
@@ -66,51 +67,65 @@ class MyDataset(Dataset):
 
 if __name__ == '__main__':
     # 加载数据
-    all_data = read_data(os.path.join("data", "train.txt"), 10)
+    all_data = read_data(os.path.join("data", "train.txt"), training_text_num)
     index_2_word, word_2_index = get_word_2_index(os.path.join("data", "vocab.txt"))
     vocab_len = len(index_2_word)
 
     train_dataset = MyDataset(all_data, word_2_index)
     train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False, collate_fn=train_dataset.pro_data)
 
-    model = GPT_Model(vocab_len).to(device)
+    # model
+    model = GPT_Model(vocab_len)
+
+    cuda_num = torch.cuda.device_count()
+    print("cuda num: {}".format(cuda_num))
+    if cuda_num > 1:
+        """data parallel"""
+        # model = nn.DataParallel(model, device_ids=[0, 1], output_device=0)
+        model = nn.DataParallel(model)
+
+    model = model.to(device)
+
+    # 计算模型参数
+    model_size = sum([i.numel() for i in model.parameters()])
+    print(f"model_size:{model_size / 1000 / 1000} M")
+
+    # exit()
     opt = torch.optim.Adam(model.parameters(), lr=lr)
 
     model.train()
     for i in range(epoch):
+        # break
         for inputs, outputs in tqdm(train_dataloader):
             inputs = inputs.to(device)
             outputs = outputs.to(device)
 
             loss = model(inputs, outputs)
-            loss.backward()
+
+            # 多卡训练时需要计算平均梯度
+            if cuda_num > 1:
+                loss.mean().backward()
+            else:
+                loss.backward()
 
             opt.step()
             opt.zero_grad()
 
-        print(f"loss:{loss:.3f}")
-    torch.save(model.state_dict(), os.path.join('model', "model.pth"))
+        if cuda_num > 1:
+            print(f"loss:{loss.mean().item():.3f}")
+        else:
+            print(f"loss:{loss.item():.3f}")
+
+    # save model
+    torch.save(model.state_dict(), os.path.join('model', "model_{}.pth".format(i)))
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('model', "model.pth")), strict=False)
+    model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
     model.eval()
-    while True:
-        user_query = input("请输入：")
-        user_query = user_query + "\n"
-        input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in user_query]
-        input_idx = torch.tensor([input_idx], device=device)
 
-        # method 1
-        # model_out = model.predict_greedy_search(input_idx)
-        # model_out = [index_2_word[i] for i in model_out]
-        # print("".join(model_out))
-        # #
-        # # # method 2
-        # model_out = model.predict_random_search(input_idx)
-        # model_out = [index_2_word[i] for i in model_out]
-        # print("".join(model_out))
-
-        # method 3
-        model_out = model.predict_circle_search(input_idx)
-        model_out = [index_2_word[i] for i in model_out]
-        print("".join(model_out))
+    user_query = "你好\n"
+    input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in user_query]
+    input_idx = torch.tensor([input_idx], device=device)
+    model_out = model.predict_circle_search(input_idx)
+    model_out = [index_2_word[i] for i in model_out]
+    print("".join(model_out))

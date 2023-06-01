@@ -9,8 +9,8 @@ import copy
 class EmbeddingLayer(nn.Module):
     def __init__(self, vocab_len):
         super().__init__()
-        self.pos_embedding = nn.Embedding(max_len, 768)  # 位置编码
-        self.token_embedding = nn.Embedding(vocab_len, 768)  # 词嵌入
+        self.pos_embedding = nn.Embedding(max_len, hidden_state)  # 位置编码
+        self.token_embedding = nn.Embedding(vocab_len, hidden_state)  # 词嵌入
 
     def forward(self, x):
         seq_len = x.shape[1]
@@ -27,11 +27,11 @@ class EmbeddingLayer(nn.Module):
 class Feed_Forward(nn.Module):
     def __init__(self):
         super().__init__()
-        self.linear1 = nn.Linear(768, 1024)
-        self.relu = nn.ReLU()
-        self.linear2 = nn.Linear(1024, 768)
+        self.linear1 = nn.Linear(hidden_state, hidden_state * 4)
+        self.relu = nn.GELU()
+        self.linear2 = nn.Linear(hidden_state * 4, hidden_state)
 
-        self.layer_norm = nn.LayerNorm(768)
+        self.layer_norm = nn.LayerNorm(hidden_state)
 
     def forward(self, x):
         # copy_x = copy.deepcopy(x)
@@ -48,16 +48,16 @@ class Feed_Forward(nn.Module):
 class MultiHeadAttention(nn.Module):
     def __init__(self):
         super().__init__()
-        self.Q = nn.Linear(768, 768)
-        self.K = nn.Linear(768, 768)
-        self.V = nn.Linear(768, 768)
-        self.layer_norm = nn.LayerNorm(768)
+        self.Q = nn.Linear(hidden_state, hidden_state)
+        self.K = nn.Linear(hidden_state, hidden_state)
+        self.V = nn.Linear(hidden_state, hidden_state)
+        self.layer_norm = nn.LayerNorm(hidden_state)
 
-        self.head_num = 12
+        self.head_num = head_num
 
-        self.softmax = nn.Softmax(2)
+        self.softmax = nn.Softmax(3)
 
-    def forward(self, x, mask):
+    def forward(self, x, mask, pad_mask):
         cur_batch, seq_len, _ = x.shape
         # copy_x = copy.deepcopy(x)
         copy_x = x
@@ -78,17 +78,14 @@ class MultiHeadAttention(nn.Module):
         # attn
         # weight = torch.mean(x, dim=-1, keepdim=True)
 
-        # # attn_mask 拆头
-        # attn_mask = attn_mask.unsqueeze(1).expand(cur_batch, 1, seq_len, seq_len)
-        # attn_mask = attn_mask.repeat(1, self.head_num, 1, 1)
-        #
-        # # look ahead mask
-        # look_ahead_mask = torch.triu(torch.ones_like(attn_mask), 1).to(x.device)
-        # mask = (attn_mask + look_ahead_mask) >= 1
-
-        weight = q @ k.transpose(-1, -2) / 20
+        # QK的T
+        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(hidden_state))
         weight.masked_fill_(mask, -1e9)
+
         score = self.softmax(weight)
+
+        # todo  pad 位置attn score 全部置为0  自动求导报错
+        # score.masked_fill_(pad_mask, 0)
 
         x = score @ v
         # mutil-head 还原
@@ -105,15 +102,16 @@ class DecoderBlock(nn.Module):
     def __init__(self):
         super().__init__()
         self.attention_block1 = MultiHeadAttention()
-        self.attention_block2 = MultiHeadAttention()
+        self.attention_block2 = MultiHeadAttention()  # 没用到
         self.feed_forward = Feed_Forward()
 
-    def forward(self, x, mask):
-        x = self.attention_block1(x, mask)
+    def forward(self, x, mask, pad_mask):
+        x = self.attention_block1(x, mask, pad_mask)
 
-        # 第二个头无需mask
-        # mask = torch.zeros_like(mask, device=device)
+        # 原transformers 无mask的多头注意力机制，GPT没有这一层
+        # mask = torch.zeros_like(mask, device=device) # 将mask矩阵全部置为0
         # x = self.attention_block2(x, mask)
+
         x = self.feed_forward(x)
 
         return x
@@ -124,24 +122,27 @@ class Decoder(nn.Module):
         super().__init__()
         self.embedding = EmbeddingLayer(vob_len)
         # self.layers = nn.Sequential(*[DecoderBlock() for i in range(3)])
-        self.layers = nn.ModuleList([DecoderBlock() for i in range(12)])
+        self.layers = nn.ModuleList([DecoderBlock() for i in range(decoder_layer_num)])
 
     def forward(self, x):
-        cur_batch, seq_len = x.shape
+        cur_batch, seq_len = x.shape  # [batch_size, seq_length]
 
-        attn_mask = get_attention_mask(x)
+        # 获取pad mask
+        pad_mask = get_pad_mask(x)  # [batch_size, seq_length, 1]
 
-        # attn_mask 拆头
-        attn_mask = attn_mask.unsqueeze(1).expand(cur_batch, 1, seq_len, seq_len)
-        attn_mask = attn_mask.repeat(1, head_num, 1, 1)
+        # pad_mask 拆头
+        pad_mask = pad_mask.unsqueeze(1)  # [batch_size,1, seq_length, 1]
+        pad_mask = pad_mask.expand(cur_batch, 1, seq_len, seq_len)  # [batch_size,1, seq_length, seq_length]
+        pad_mask = pad_mask.repeat(1, head_num, 1, 1)  # [batch_size,attn_head_num, seq_length, seq_length]
 
         # look ahead mask
-        look_ahead_mask = torch.triu(torch.ones_like(attn_mask), 1).to(x.device)
-        mask = (attn_mask + look_ahead_mask) >= 1
+        look_ahead_mask = torch.triu(torch.ones_like(pad_mask), 1).to(
+            x.device)  # [batch_size,attn_head_num, seq_length, seq_length] 每一个头都为相同的下三角矩阵
+        mask = (pad_mask + look_ahead_mask) >= 1
 
         emb = self.embedding(x)
         for layer in self.layers:
-            out = layer(emb, mask)
+            out = layer(emb, mask, pad_mask)
         return out
 
 
@@ -151,7 +152,7 @@ class GPT_Model(nn.Module):
 
         self.decoder = Decoder(vob_len)
 
-        self.cls = nn.Linear(768, vob_len)
+        self.cls = nn.Linear(hidden_state, vob_len)
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, x, y=None):
@@ -192,14 +193,21 @@ class GPT_Model(nn.Module):
     def predict_circle_search(self, x):
         while True:
             pre = self.forward(x)
-            weight, idx = torch.sort(pre)
 
-            weight = nn.Softmax(dim=-1).forward(weight[0][-1])
-            topk_weight_list = weight.tolist()[::-1][:top_k]
-            # topk_weight_list = nn.Softmax(-1).forward(torch.tensor(topk_weight_list))
-            topk_weight_list = [int(i * 10) for i in topk_weight_list]
+            # 根据每个字预测的词表进行排序
+            weight, idx = torch.sort(pre, descending=True)
 
-            topk_idx_list = idx[0][-1].tolist()[::-1][:top_k]
+            # 利用最后一个字预测下一个字
+            # weight = nn.Softmax(dim=-1).forward(weight[0][-1])
+
+            # 取出最后一个字的 top k
+            topk_weight_list = weight[0][-1].tolist()[:top_k]
+
+            # 利用概率分布 构造轮盘
+            topk_weight_list = nn.Softmax(-1).forward(torch.tensor(topk_weight_list))
+            topk_weight_list = [int(i * 20) for i in topk_weight_list]
+
+            topk_idx_list = idx[0][-1].tolist()[:top_k]
 
             random_list = [i for i, times in zip(topk_idx_list, topk_weight_list) for j in range(times)]
             pre = random.choice(random_list)
@@ -210,10 +218,10 @@ class GPT_Model(nn.Module):
         return x[0]
 
 
-def get_attention_mask(x):
+def get_pad_mask(x):
     """
     pad mask
     """
     padding_position = (x == 0)
-    padding_position = torch.unsqueeze(padding_position, dim=-1)
+    padding_position = torch.unsqueeze(padding_position, dim=-1)  # 升维
     return padding_position
