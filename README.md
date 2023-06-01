@@ -1,5 +1,7 @@
 # GPT1结构的简单复现
 
+训练数据：
+多轮对话50w条
 
 配置文件: config.py \
 模型文件: model_gpt.py \

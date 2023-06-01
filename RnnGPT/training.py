@@ -2,7 +2,7 @@ import os
 from torch.utils.data import Dataset, DataLoader
 import torch
 from model_gpt import GPT_Model
-from config import *
+import config
 from tqdm import tqdm
 import torch.nn as nn
 
@@ -82,14 +82,13 @@ if __name__ == '__main__':
     else:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 
-
     # cuda num
     cuda_num = torch.cuda.device_count()
     print("cuda num: {}".format(cuda_num))
 
     # 加载数据
-    all_data = read_data(os.path.join("data", "train.txt"), training_text_num)
-    index_2_word, word_2_index = get_word_2_index(os.path.join("data", "vocab.txt"))
+    all_data = read_data(os.path.join("../data", "train.txt"), training_text_num)
+    index_2_word, word_2_index = get_word_2_index(os.path.join("../data", "vocab.txt"))
     vocab_len = len(index_2_word)
     train_dataset = MyDataset(all_data, word_2_index)
 
@@ -146,10 +145,10 @@ if __name__ == '__main__':
             print(f"loss:{loss.item():.3f}")
 
     # save model
-    torch.save(model.state_dict(), os.path.join('model', "model_{}.pth".format(i)))
+    torch.save(model.state_dict(), os.path.join('../model', "model_{}.pth".format(i)))
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
+    model.load_state_dict(torch.load(os.path.join('../model', "model_9.pth")), strict=False)
     model.eval()
 
     user_query = "你好\n"
