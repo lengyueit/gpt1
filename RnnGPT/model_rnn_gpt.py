@@ -68,18 +68,18 @@ class MultiHeadAttention(nn.Module):
     多头注意力机制
     """
 
-    def __init__(self):
+    def __init__(self, head_num):
         super().__init__()
         self.Q = nn.Linear(config.hidden_state, config.hidden_state)
         self.K = nn.Linear(config.hidden_state, config.hidden_state)
         self.V = nn.Linear(config.hidden_state, config.hidden_state)
         self.layer_norm = nn.LayerNorm(config.hidden_state)
 
-        self.head_num = config.head_num
+        self.head_num = head_num
 
         self.softmax = nn.Softmax(3)
 
-    def forward(self, x, mask, pad_mask):
+    def forward(self, x, mask=None, pad_mask=None):
         cur_batch, seq_len, _ = x.shape
         # copy_x = copy.deepcopy(x)
         copy_x = x
@@ -100,9 +100,10 @@ class MultiHeadAttention(nn.Module):
         # attn
         # weight = torch.mean(x, dim=-1, keepdim=True)
 
-        # QK的T
+        # Q @ K的T
         weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(config.hidden_state))
-        weight.masked_fill_(mask, -1e9)
+        if mask:
+            weight.masked_fill_(mask, -1e9)
 
         score = self.softmax(weight)
 
@@ -136,6 +137,8 @@ class LinearAttention(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_state)
 
     def forward(self, x):
+        copy_x = x
+
         # 保证q k 非负
         q = self.Q(x)
         q = my_elu(q)
@@ -144,6 +147,44 @@ class LinearAttention(nn.Module):
         k = my_elu(k)
 
         v = self.V(x)
+
+        KV = k.transpose(1, 2) @ v
+        # QK = q @ k.transpose(1, 2)
+
+        x = q @ KV
+
+        result = self.layer_norm(copy_x + x)
+        return result
+
+
+class SelfAttention(nn.Module):
+    """self attentino"""
+
+    def __init__(self):
+        super().__init__()
+        self.Q = nn.Linear(config.hidden_state, config.hidden_state)
+        self.K = nn.Linear(config.hidden_state, config.hidden_state)
+        self.V = nn.Linear(config.hidden_state, config.hidden_state)
+        self.layer_norm = nn.LayerNorm(config.hidden_state)
+
+        self.softmax = nn.Softmax(dim=-1)
+
+    def forward(self, x):
+        copy_x = x
+        # 保证q k 非负
+        q = self.Q(x)
+        k = self.K(x)
+        v = self.V(x)
+
+        # QK的T V
+        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(config.hidden_state))
+        score = self.softmax(weight)
+        x = score @ v
+
+        # 残差
+        x = copy_x + x
+        x = self.layer_norm(x)
+        return x
 
 
 class DecoderBlock(nn.Module):
@@ -171,7 +212,7 @@ class Decoder(nn.Module):
 
         emb = self.embedding(x)
         for layer in self.layers:
-            out = layer(emb, mask, pad_mask)
+            out = layer(emb)
         return out
 
 
@@ -243,3 +284,50 @@ class RNN_GPT_Model(nn.Module):
             if pre == 2:
                 break
         return x[0]
+
+
+if __name__ == '__main__':
+    X = torch.rand(10, 5000, 768)
+
+    X = X.cuda()
+    model_selfatten = SelfAttention()
+    model_selfatten.cuda()
+    model_selfatten.eval()
+
+    model_multihead = MultiHeadAttention(1)
+    model_multihead.cuda()
+    model_multihead.eval()
+
+    model_linear = LinearAttention()
+    model_linear.cuda()
+    model_linear.eval()
+
+    softmax_start = torch.cuda.Event(enable_timing=True)
+    softmax_end = torch.cuda.Event(enable_timing=True)
+    multihead_start = torch.cuda.Event(enable_timing=True)
+    multihead_end = torch.cuda.Event(enable_timing=True)
+    linear_start = torch.cuda.Event(enable_timing=True)
+    linear_end = torch.cuda.Event(enable_timing=True)
+
+    with torch.no_grad():
+        softmax_start.record()
+        y = model_selfatten.forward(X)
+        softmax_end.record()
+        torch.cuda.synchronize()
+        elapsed_time = softmax_start.elapsed_time(softmax_end)
+        print(f"self-attention :{elapsed_time} ms")
+
+        multihead_start.record()
+        y = model_multihead.forward(X)
+        multihead_end.record()
+        torch.cuda.synchronize()
+        elapsed_time = multihead_start.elapsed_time(multihead_end)
+        print(f"multihead-attention :{elapsed_time} ms")
+
+    with torch.no_grad():
+        linear_start.record()
+        y = model_linear.forward(X)
+        linear_end.record()
+        torch.cuda.synchronize()
+        elapsed_time = linear_start.elapsed_time(linear_end)
+        print(f"linear-attention :{elapsed_time} ms")
