@@ -1,6 +1,7 @@
 import os
 from model_gpt import GPT_Model
 from config import *
+import torch
 
 
 def get_word_2_index(path):
@@ -13,6 +14,7 @@ def get_word_2_index(path):
 
 
 if __name__ == '__main__':
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     index_2_word, word_2_index = get_word_2_index(os.path.join("../data", "vocab.txt"))
     vocab_len = len(index_2_word)
 
@@ -62,4 +64,4 @@ if __name__ == '__main__':
         input_idx = []
 
         print("history:{}".format(history))
-        print(history[-1])
+        print("chatbot的回复: {}".format(history[-1]))

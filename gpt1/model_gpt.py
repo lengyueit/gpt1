@@ -5,6 +5,8 @@ import torch.nn as nn
 from config import *
 import copy
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 
 class EmbeddingLayer(nn.Module):
     def __init__(self, vocab_len):
