@@ -9,10 +9,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, vocab_len):
+    def __init__(self, arg,vocab_len):
         super().__init__()
-        self.pos_embedding = nn.Embedding(max_len, hidden_state)  # 位置编码
-        self.token_embedding = nn.Embedding(vocab_len, hidden_state)  # 词嵌入
+        self.arg = arg
+        self.pos_embedding = nn.Embedding(self.arg.max_len, self.arg.hidden_state)  # 位置编码
+        self.token_embedding = nn.Embedding(vocab_len, self.arg.hidden_state)  # 词嵌入
 
     def forward(self, x):
         seq_len = x.shape[1]
@@ -27,13 +28,14 @@ class EmbeddingLayer(nn.Module):
 
 
 class Feed_Forward(nn.Module):
-    def __init__(self):
+    def __init__(self,arg):
         super().__init__()
-        self.linear1 = nn.Linear(hidden_state, hidden_state * 4)
+        self.arg = arg
+        self.linear1 = nn.Linear(self.arg.hidden_state, self.arg.hidden_state * 4)
         self.relu = nn.GELU()
-        self.linear2 = nn.Linear(hidden_state * 4, hidden_state)
+        self.linear2 = nn.Linear(self.arg.hidden_state * 4, self.arg.hidden_state)
 
-        self.layer_norm = nn.LayerNorm(hidden_state)
+        self.layer_norm = nn.LayerNorm(self.arg.hidden_state)
 
     def forward(self, x):
         # copy_x = copy.deepcopy(x)
@@ -48,14 +50,15 @@ class Feed_Forward(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self):
+    def __init__(self,arg):
         super().__init__()
-        self.Q = nn.Linear(hidden_state, hidden_state)
-        self.K = nn.Linear(hidden_state, hidden_state)
-        self.V = nn.Linear(hidden_state, hidden_state)
-        self.layer_norm = nn.LayerNorm(hidden_state)
+        self.arg = arg
+        self.Q = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
+        self.K = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
+        self.V = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
+        self.layer_norm = nn.LayerNorm(self.arg.hidden_state)
 
-        self.head_num = head_num
+        self.head_num = self.arg.head_num
 
         self.softmax = nn.Softmax(3)
 
@@ -81,7 +84,7 @@ class MultiHeadAttention(nn.Module):
         # weight = torch.mean(x, dim=-1, keepdim=True)
 
         # QK的T
-        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(hidden_state))
+        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(self.arg.hidden_state))
         weight.masked_fill_(mask, -1e9)
 
         score = self.softmax(weight)
@@ -101,11 +104,12 @@ class MultiHeadAttention(nn.Module):
 
 
 class DecoderBlock(nn.Module):
-    def __init__(self):
+    def __init__(self,arg):
         super().__init__()
-        self.attention_block1 = MultiHeadAttention()
-        self.attention_block2 = MultiHeadAttention()  # 没用到
-        self.feed_forward = Feed_Forward()
+        self.arg = arg
+        self.attention_block1 = MultiHeadAttention(self.arg)
+        self.attention_block2 = MultiHeadAttention(self.arg)  # 没用到
+        self.feed_forward = Feed_Forward(self.arg)
 
     def forward(self, x, mask, pad_mask):
         x = self.attention_block1(x, mask, pad_mask)
@@ -120,11 +124,12 @@ class DecoderBlock(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self, vob_len):
+    def __init__(self, arg, vob_len):
         super().__init__()
-        self.embedding = EmbeddingLayer(vob_len)
+        self.arg = arg
+        self.embedding = EmbeddingLayer(self.arg,vob_len)
         # self.layers = nn.Sequential(*[DecoderBlock() for i in range(3)])
-        self.layers = nn.ModuleList([DecoderBlock() for i in range(decoder_layer_num)])
+        self.layers = nn.ModuleList([DecoderBlock(self.arg) for i in range(self.arg.decoder_layer_num)])
 
     def forward(self, x):
         cur_batch, seq_len = x.shape  # [batch_size, seq_length]
@@ -135,9 +140,9 @@ class Decoder(nn.Module):
         # pad_mask 拆头
         pad_mask = pad_mask.unsqueeze(1)  # [batch_size,1, seq_length, 1]
         pad_mask = pad_mask.expand(cur_batch, 1, seq_len, seq_len)  # [batch_size,1, seq_length, seq_length]
-        pad_mask = pad_mask.repeat(1, head_num, 1, 1)  # [batch_size,attn_head_num, seq_length, seq_length]
+        pad_mask = pad_mask.repeat(1, self.arg.head_num, 1, 1)  # [batch_size,attn_head_num, seq_length, seq_length]
 
-        # look ahead mask
+        # look ahead masks
         look_ahead_mask = torch.triu(torch.ones_like(pad_mask), 1).to(
             x.device)  # [batch_size,attn_head_num, seq_length, seq_length] 每一个头都为相同的下三角矩阵
         mask = (pad_mask + look_ahead_mask) >= 1
@@ -149,12 +154,12 @@ class Decoder(nn.Module):
 
 
 class GPT_Model(nn.Module):
-    def __init__(self, vob_len):
+    def __init__(self, arg, vob_len):
         super().__init__()
+        self.arg = arg
+        self.decoder = Decoder(self.arg, vob_len)
 
-        self.decoder = Decoder(vob_len)
-
-        self.cls = nn.Linear(hidden_state, vob_len)
+        self.cls = nn.Linear(arg.hidden_state, vob_len)
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, x, y=None):
@@ -184,7 +189,7 @@ class GPT_Model(nn.Module):
         while True:
             pre = self.forward(x)
             _, indexes = torch.sort(pre)
-            topk_list = indexes[0][-1].tolist()[::-1][:top_k]
+            topk_list = indexes[0][-1].tolist()[::-1][:self.arg.top_k]
             pre = random.choice(topk_list)
             x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=device)], dim=-1)
 
@@ -203,13 +208,13 @@ class GPT_Model(nn.Module):
             # weight = nn.Softmax(dim=-1).forward(weight[0][-1])
 
             # 取出最后一个字的 top k
-            topk_weight_list = weight[0][-1].tolist()[:top_k]
+            topk_weight_list = weight[0][-1].tolist()[:self.arg.top_k]
 
             # 利用概率分布 构造轮盘
             topk_weight_list = nn.Softmax(-1).forward(torch.tensor(topk_weight_list))
             topk_weight_list = [int(i * 20) for i in topk_weight_list]
 
-            topk_idx_list = idx[0][-1].tolist()[:top_k]
+            topk_idx_list = idx[0][-1].tolist()[:self.arg.top_k]
 
             random_list = [i for i, times in zip(topk_idx_list, topk_weight_list) for j in range(times)]
             pre = random.choice(random_list)

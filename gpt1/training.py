@@ -1,13 +1,12 @@
 import os
+from config import parser
+
 from torch.utils.data import Dataset, DataLoader
 import torch
 from model_gpt import GPT_Model
-from config import *
+
 from tqdm import tqdm
 import torch.nn as nn
-
-import argparse
-import torch.distributed as dist
 
 
 def read_data(path, num=None):
@@ -43,7 +42,7 @@ class MyDataset(Dataset):
 
             text_id.append(self.word_2_index["<sep>"])
 
-        text_id = text_id[:max_len]
+        text_id = text_id[:arg.max_len]
         input_data = text_id[:-1]
         output_data = text_id[1:]
 
@@ -69,62 +68,41 @@ class MyDataset(Dataset):
 
 
 if __name__ == '__main__':
-    # 参数设置
-    parser = argparse.ArgumentParser(description='this is a gpt trainer')
-    parser.add_argument("--local_rank", default=os.getenv('LOCAL_RANK', -1), type=int)
-    args = parser.parse_args()
 
-    # 分布式初始化
-    if args.local_rank != -1:
-        torch.cuda.set_device(args.local_rank)
-        device = torch.device("cuda", args.local_rank)
-        torch.distributed.init_process_group(backend="nccl", init_method='env://')
-    else:
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
+    arg = parser.parse_args()
 
     # cuda num
     cuda_num = torch.cuda.device_count()
     print("cuda num: {}".format(cuda_num))
 
-    # 加载数据
-    all_data = read_data(os.path.join("../data", "train.txt"), training_text_num)
-    index_2_word, word_2_index = get_word_2_index(os.path.join("../data", "vocab.txt"))
-    vocab_len = len(index_2_word)
-    train_dataset = MyDataset(all_data, word_2_index)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # 分布式处理数据
-    if args.local_rank != -1:
-        train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
-        train_dataloader = DataLoader(train_dataset, batch_size, sampler=train_sampler, shuffle=False,
-                                      collate_fn=train_dataset.pro_data)
-    else:
-        train_dataloader = DataLoader(train_dataset, batch_size, shuffle=False,
-                                      collate_fn=train_dataset.pro_data)
+    # load data
+    all_data = read_data(os.path.join("./data", "train.txt"), arg.training_text_num)
+    index_2_word, word_2_index = get_word_2_index(os.path.join("./data", "vocab.txt"))
+    vocab_len = len(index_2_word)
+
+    train_dataset = MyDataset(all_data, word_2_index)
+    train_dataloader = DataLoader(train_dataset, arg.batch_size, shuffle=False,
+                                  collate_fn=train_dataset.pro_data)
 
     # model
-    model = GPT_Model(vocab_len)
-    # if cuda_num > 1:
-    #     model = nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank],
-    #                                                 output_device=args.local_rank)
-
-    # todo data parallel
+    model = GPT_Model(arg, vocab_len)
+    # DP
     if cuda_num > 1:
         model = nn.DataParallel(model)
-    model = model.to(device)
+
+    model.to(device)
 
     # 计算模型参数
     model_size = sum([i.numel() for i in model.parameters()])
     print(f"model_size:{model_size / 1000 / 1000} M")
 
     # exit()
-    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    opt = torch.optim.Adam(model.parameters(), lr=arg.lr)
 
     model.train()
-    for i in range(epoch):
-        # if cuda_num > 1:
-        #     train_sampler.set_epoch(epoch)  # shuffle
-
+    for i in range(arg.epoch):
         for inputs, outputs in tqdm(train_dataloader):
             inputs = inputs.to(device)
             outputs = outputs.to(device)
@@ -146,10 +124,10 @@ if __name__ == '__main__':
             print(f"loss:{loss.item():.3f}")
 
     # save model
-    torch.save(model.state_dict(), os.path.join('../model', "model_{}.pth".format(i)))
+    torch.save(model.state_dict(), os.path.join('./model', "model_{}.pth".format(i)))
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('../model', "model_9.pth")), strict=False)
+    model.load_state_dict(torch.load(os.path.join('./model', "model_9.pth")), strict=False)
     model.eval()
 
     user_query = "你好\n"

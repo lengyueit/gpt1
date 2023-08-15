@@ -15,13 +15,13 @@ def get_word_2_index(path):
 
 if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    index_2_word, word_2_index = get_word_2_index(os.path.join("../data", "vocab.txt"))
+    index_2_word, word_2_index = get_word_2_index(os.path.join(".", "data", "vocab.txt"))
     vocab_len = len(index_2_word)
 
     model = GPT_Model(vocab_len).to(device)
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('../model', "model_9.pth")), strict=False)
+    model.load_state_dict(torch.load(os.path.join('model', "model.pth"),map_location="cpu"), strict=False)
     model.eval()
 
     # 记录历史信息
