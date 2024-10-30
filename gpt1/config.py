@@ -4,7 +4,7 @@ import argparse
 parser = argparse.ArgumentParser()
 
 # training
-parser.add_argument("--training_sample_num", default=1, help="训练样本数", type=int)
+parser.add_argument("--training_sample_num", help="训练样本数", type=int)
 parser.add_argument("--batch_size", default=1, help="batch_size", type=int)
 parser.add_argument("--epoch", default=10, help="epoch", type=int)
 parser.add_argument("--max_len", default=512, help="文本最大长度", type=int)
