@@ -9,11 +9,11 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class EmbeddingLayer(nn.Module):
-    def __init__(self, arg,vocab_len):
+    def __init__(self, arg, vocab_len):
         super().__init__()
         self.arg = arg
-        self.pos_embedding = nn.Embedding(self.arg.max_len, self.arg.hidden_state)  # 位置编码
-        self.token_embedding = nn.Embedding(vocab_len, self.arg.hidden_state)  # 词嵌入
+        self.pos_embedding = nn.Embedding(self.arg.max_len, self.arg.hidden_layer_state)  # 位置编码
+        self.token_embedding = nn.Embedding(vocab_len, self.arg.hidden_layer_state)  # 词嵌入
 
     def forward(self, x):
         seq_len = x.shape[1]
@@ -28,14 +28,14 @@ class EmbeddingLayer(nn.Module):
 
 
 class Feed_Forward(nn.Module):
-    def __init__(self,arg):
+    def __init__(self, arg):
         super().__init__()
         self.arg = arg
-        self.linear1 = nn.Linear(self.arg.hidden_state, self.arg.hidden_state * 4)
+        self.linear1 = nn.Linear(self.arg.hidden_layer_state, self.arg.hidden_layer_state * 4)
         self.relu = nn.GELU()
-        self.linear2 = nn.Linear(self.arg.hidden_state * 4, self.arg.hidden_state)
+        self.linear2 = nn.Linear(self.arg.hidden_layer_state * 4, self.arg.hidden_layer_state)
 
-        self.layer_norm = nn.LayerNorm(self.arg.hidden_state)
+        self.layer_norm = nn.LayerNorm(self.arg.hidden_layer_state)
 
     def forward(self, x):
         # copy_x = copy.deepcopy(x)
@@ -50,13 +50,13 @@ class Feed_Forward(nn.Module):
 
 
 class MultiHeadAttention(nn.Module):
-    def __init__(self,arg):
+    def __init__(self, arg):
         super().__init__()
         self.arg = arg
-        self.Q = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
-        self.K = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
-        self.V = nn.Linear(self.arg.hidden_state, self.arg.hidden_state)
-        self.layer_norm = nn.LayerNorm(self.arg.hidden_state)
+        self.Q = nn.Linear(self.arg.hidden_layer_state, self.arg.hidden_layer_state)
+        self.K = nn.Linear(self.arg.hidden_layer_state, self.arg.hidden_layer_state)
+        self.V = nn.Linear(self.arg.hidden_layer_state, self.arg.hidden_layer_state)
+        self.layer_norm = nn.LayerNorm(self.arg.hidden_layer_state)
 
         self.head_num = self.arg.head_num
 
@@ -83,8 +83,8 @@ class MultiHeadAttention(nn.Module):
         # attn
         # weight = torch.mean(x, dim=-1, keepdim=True)
 
-        # QK的T
-        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(self.arg.hidden_state))
+        # Q @ K的T
+        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(self.arg.hidden_layer_state))
         weight.masked_fill_(mask, -1e9)
 
         score = self.softmax(weight)
@@ -104,7 +104,7 @@ class MultiHeadAttention(nn.Module):
 
 
 class DecoderBlock(nn.Module):
-    def __init__(self,arg):
+    def __init__(self, arg):
         super().__init__()
         self.arg = arg
         self.attention_block1 = MultiHeadAttention(self.arg)
@@ -127,7 +127,7 @@ class Decoder(nn.Module):
     def __init__(self, arg, vob_len):
         super().__init__()
         self.arg = arg
-        self.embedding = EmbeddingLayer(self.arg,vob_len)
+        self.embedding = EmbeddingLayer(self.arg, vob_len)
         # self.layers = nn.Sequential(*[DecoderBlock() for i in range(3)])
         self.layers = nn.ModuleList([DecoderBlock(self.arg) for i in range(self.arg.decoder_layer_num)])
 
@@ -159,7 +159,7 @@ class GPT_Model(nn.Module):
         self.arg = arg
         self.decoder = Decoder(self.arg, vob_len)
 
-        self.cls = nn.Linear(arg.hidden_state, vob_len)
+        self.cls = nn.Linear(arg.hidden_layer_state, vob_len)
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, x, y=None):

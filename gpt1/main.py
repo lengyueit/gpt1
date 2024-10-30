@@ -3,29 +3,11 @@ from config import parser
 
 from torch.utils.data import Dataset, DataLoader
 import torch
-from model_gpt import GPT_Model
+from src.gpt.model_gpt import GPT_Model
 
 from tqdm import tqdm
 import torch.nn as nn
-
-
-def read_data(path, num=None):
-    with open(path, encoding="utf8") as f:
-        all_data = f.read().split("\n\n")
-
-    if num:
-        return all_data[:-1][:num]
-    else:
-        return all_data[:-1]
-
-
-def get_word_2_index(path):
-    with open(path, encoding="utf8") as f:
-        index_2_word = f.read().split("\n")
-
-    word_2_index = {w: i for i, w in enumerate(index_2_word)}
-
-    return index_2_word, word_2_index
+from utils import *
 
 
 class MyDataset(Dataset):
@@ -67,21 +49,15 @@ class MyDataset(Dataset):
         return torch.tensor(new_input_data), torch.tensor(new_output_data)
 
 
-if __name__ == '__main__':
+def evaling(model, inputs="你好\n"):
+    input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in inputs]
+    input_idx = torch.tensor([input_idx], device=device)
+    model_out = model.predict_circle_search(input_idx)
+    model_out = [index_2_word[i] for i in model_out]
+    print("".join(model_out))
 
-    arg = parser.parse_args()
 
-    # cuda num
-    cuda_num = torch.cuda.device_count()
-    print("cuda num: {}".format(cuda_num))
-
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    # load data
-    all_data = read_data(os.path.join("./data", "train.txt"), arg.training_text_num)
-    index_2_word, word_2_index = get_word_2_index(os.path.join("./data", "vocab.txt"))
-    vocab_len = len(index_2_word)
-
+def training():
     train_dataset = MyDataset(all_data, word_2_index)
     train_dataloader = DataLoader(train_dataset, arg.batch_size, shuffle=False,
                                   collate_fn=train_dataset.pro_data)
@@ -130,9 +106,22 @@ if __name__ == '__main__':
     model.load_state_dict(torch.load(os.path.join('./model', "model_9.pth")), strict=False)
     model.eval()
 
-    user_query = "你好\n"
-    input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in user_query]
-    input_idx = torch.tensor([input_idx], device=device)
-    model_out = model.predict_circle_search(input_idx)
-    model_out = [index_2_word[i] for i in model_out]
-    print("".join(model_out))
+    evaling(model)
+
+if __name__ == '__main__':
+    # loading hyper-para
+    arg = parser.parse_args()
+
+    # cuda num
+    cuda_num = torch.cuda.device_count()
+    print("cuda num: {}".format(cuda_num))
+
+    # device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # load data
+    all_data = read_data(os.path.join("./data", "train.txt"), arg.training_sample_num)
+    index_2_word, word_2_index = get_word_2_index(os.path.join("./data", "vocab.txt"))
+    vocab_len = len(index_2_word)
+
+    training()

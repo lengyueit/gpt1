@@ -1,27 +1,20 @@
 import os
-from model_gpt import GPT_Model
-from config import *
+from src.gpt.model_gpt import GPT_Model
 import torch
-
-
-def get_word_2_index(path):
-    with open(path, encoding="utf8") as f:
-        index_2_word = f.read().split("\n")
-
-    word_2_index = {w: i for i, w in enumerate(index_2_word)}
-
-    return index_2_word, word_2_index
-
+from utils import *
+from config import parser
 
 if __name__ == '__main__':
+    arg = parser.parse_args()
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     index_2_word, word_2_index = get_word_2_index(os.path.join(".", "data", "vocab.txt"))
     vocab_len = len(index_2_word)
 
-    model = GPT_Model(vocab_len).to(device)
+    model = GPT_Model(arg, vocab_len).to(device)
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('model', "model.pth"),map_location="cpu"), strict=False)
+    model.load_state_dict(torch.load(os.path.join('model', "model.pth"), map_location="cpu"), strict=False)
     model.eval()
 
     # 记录历史信息
