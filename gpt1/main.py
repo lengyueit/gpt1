@@ -63,7 +63,7 @@ def training():
                                   collate_fn=train_dataset.pro_data)
 
     # model
-    model = GPT_Model(arg, vocab_len)
+    model = GPT_Model(vocab_len)
     # DP
     if cuda_num > 1:
         model = nn.DataParallel(model)
