@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 # from config import *
 from config import parser
-import copy
 
 # define device
 device = "cuda" if torch.cuda.is_available() else "cpu"

@@ -100,10 +100,10 @@ def training():
             print(f"loss:{loss.item():.3f}")
 
     # save model
-    torch.save(model.state_dict(), os.path.join('./model', "model_{}.pth".format(i)))
+    torch.save(model.state_dict(), os.path.join('model', "model_{}.pth".format(i)))
 
     # evl
-    model.load_state_dict(torch.load(os.path.join('./model', "model_9.pth")), strict=False)
+    model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
     model.eval()
 
     evaling(model)
@@ -120,8 +120,8 @@ if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # load data
-    all_data = read_data(os.path.join("./data", "train.txt"), arg.training_sample_num)
-    index_2_word, word_2_index = get_word_2_index(os.path.join("./data", "vocab.txt"))
+    all_data = read_data(os.path.join("../37 chinese_nlu/baseline/MLWA-Chinese-SLU/data", "train.txt"), arg.training_sample_num)
+    index_2_word, word_2_index = get_word_2_index(os.path.join("../37 chinese_nlu/baseline/MLWA-Chinese-SLU/data", "vocab.txt"))
     vocab_len = len(index_2_word)
 
     training()
