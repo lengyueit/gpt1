@@ -120,8 +120,8 @@ if __name__ == '__main__':
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # load data
-    all_data = read_data(os.path.join("../37 chinese_nlu/baseline/MLWA-Chinese-SLU/data", "train.txt"), arg.training_sample_num)
-    index_2_word, word_2_index = get_word_2_index(os.path.join("../37 chinese_nlu/baseline/MLWA-Chinese-SLU/data", "vocab.txt"))
+    all_data = read_data(arg.train_data_file_src, arg.training_sample_num)
+    index_2_word, word_2_index = get_word_2_index(arg.train_vocab)
     vocab_len = len(index_2_word)
 
     training()
