@@ -4,6 +4,7 @@ from config import parser
 from torch.utils.data import Dataset, DataLoader
 import torch
 from src.gpt.model_gpt import GPT_Model
+from src.gpt.model_gpt_linear_att import GPT_Model as GPT_Model_Linear
 
 from tqdm import tqdm
 import torch.nn as nn
@@ -63,7 +64,8 @@ def training():
                                   collate_fn=train_dataset.pro_data)
 
     # model
-    model = GPT_Model(vocab_len)
+    # model = GPT_Model(vocab_len)
+    model = GPT_Model_Linear(vocab_len)
     # DP
     if cuda_num > 1:
         model = nn.DataParallel(model)

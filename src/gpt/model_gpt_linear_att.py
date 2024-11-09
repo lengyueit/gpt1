@@ -1,9 +1,12 @@
 import random
-
 import torch
 import torch.nn as nn
 # from config import *
 from config import parser
+
+"""
+linear attention
+"""
 
 # define device
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -60,7 +63,7 @@ class MultiHeadAttention(nn.Module):
 
         self.head_num = arg.head_num
 
-        self.softmax = nn.Softmax(3)
+        # self.softmax = nn.Softmax(3)
 
     def forward(self, x, mask, pad_mask):
         cur_batch, seq_len, _ = x.shape
@@ -81,19 +84,13 @@ class MultiHeadAttention(nn.Module):
         v = v.transpose(1, 2)
 
         # attn
-        # weight = torch.mean(x, dim=-1, keepdim=True)
+        q = nn.functional.softmax(q, dim=-1)
+        k = nn.functional.softmax(k, dim=-2)
 
         # Q @ K的T
-        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(arg.hidden_layer_state))
-        # QK点积加上mask
-        weight.masked_fill_(mask, -1e9)
+        global_attention_map = k.transpose(-1, -2) @ v
 
-        weight_score = self.softmax(weight)
-
-        # todo 目前的pad 位置的attn score不为0，若全部置为0  自动求导报错
-        # weight_score.masked_fill_(pad_mask, -1e9)
-
-        x = weight_score @ v
+        x = q @ global_attention_map
         # mutil-head 还原
         x = x.transpose(1, 2).reshape(cur_batch, seq_len, -1)
 
