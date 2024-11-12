@@ -15,6 +15,8 @@ parser.add_argument("--train_data_file_src", default=os.path.join("./data", "tra
 parser.add_argument("--train_vocab", default=os.path.join("./data", "vocab.txt"), help="词表目录",
                     type=str)
 
+parser.add_argument("--model", default="softmaxAtt", help="欲训练模型", type=str)
+
 # model para
 parser.add_argument("--head_num", default=12, help="number of attention head", type=int)
 parser.add_argument("--top_k", default=5, help="beam search top_k", type=int)
