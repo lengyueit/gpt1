@@ -22,12 +22,9 @@ all_data = read_data(arg.train_data_file_src, arg.training_sample_num)
 index_2_word, word_2_index = get_word_2_index(arg.train_vocab)
 vocab_len = len(index_2_word)
 
-# cuda num
-world_size = torch.cuda.device_count()
-print("Current cuda number is: {}".format(world_size))
-
 # device
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
 
 def evaling(model, inputs="你好\n"):
     input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in inputs]
@@ -96,23 +93,19 @@ def training_dp():
     evaling(model)
 
 
-def ddp_setup(rank, world_size):
-    """
-    Args:
-        rank: Unique identifier of each process
-        world_size: Total number of processes
-    """
-    # rank 0 process
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
+def ddp_setup():
     # nccl：NVIDIA Collective Communication Library
     # 分布式情况下的，gpus 间通信
-    init_process_group(backend="nccl", rank=rank, world_size=world_size)
-    torch.cuda.set_device(rank)
+    init_process_group(backend="nccl")
+    torch.cuda.set_device(int(os.environ['LOCAL_RANK']))
 
 
-def training_ddp(rank, world_size):
-    ddp_setup(rank, world_size)
+def training_ddp():
+    """
+    利用 torchrun 启动
+    :return:
+    """
+    ddp_setup()
 
     # loader dataloader
     train_dataloader = get_loader(all_data, word_2_index)
@@ -124,14 +117,21 @@ def training_ddp(rank, world_size):
         model = GPT_Model_Linear(vocab_len)
 
     # 计算模型参数
-    model_size = sum([i.numel() for i in model.parameters()])
-    print(f"model_size:{model_size / 1000 / 1000} M")
-    model.train()
+    if os.environ['LOCAL_RANK'] == 0:
+        # cuda num
+        world_size = torch.cuda.device_count()
+        print("Current cuda number is: {}".format(world_size))
+
+        # 限制 pytorch 多进程仅输出一次模型参数大小即可
+        model_size = sum([i.numel() for i in model.parameters()])
+        print(f"model_size:{model_size / 1000 / 1000} M")
+        model.train()
 
     # 优化器
     opt = torch.optim.Adam(model.parameters(), lr=arg.lr)
 
-    trainer = Trainer(model=model, gpu_id=rank, optimizer=opt, train_dataloader=train_dataloader)
+    # training
+    trainer = Trainer(model=model, optimizer=opt, train_dataloader=train_dataloader)
     trainer.train(arg.epoch)
 
     destroy_process_group()
@@ -145,5 +145,5 @@ def training_ddp(rank, world_size):
 
 if __name__ == '__main__':
     # training_dp() 该方法已废弃
-
-    mp.spawn(training_ddp, args=(world_size,), nprocs=world_size)
+    print("Current local id is: {}".format(os.environ['LOCAL_RANK']))
+    training_ddp()
