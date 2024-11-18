@@ -1,5 +1,4 @@
 import os
-from config import parser
 
 import torch
 from src.gpt.model_gpt import GPT_Model
@@ -11,7 +10,6 @@ from utils import *
 from data_loader import get_loader
 from trainer import Trainer
 
-import torch.multiprocessing as mp
 from torch.distributed import init_process_group, destroy_process_group
 
 # loading hyper-para
