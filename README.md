@@ -9,7 +9,6 @@
 
 目录结构
 ```
-$ tree data
 ├── data
     │   train.txt # 训练数据集
     │   vocab.txt # 词表
@@ -35,3 +34,9 @@ torchrun --nproc-per-node=3 main.py --batch_size=128
 ```
 --nproc-per-node为可用显卡数 \
 --batch_size根据显存大小调整
+
+## Contact
+
+If you have any questions, please feel free to contact the authors. 
+
+Yu Guo: [guoyugy@stu.scu.edu.cn](guoyugy@stu.scu.edu.cn)
