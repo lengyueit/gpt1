@@ -6,10 +6,13 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 from tqdm import tqdm
 import os
+import logging
+from evaluation import evaling
 
 """
 Trainer 训练器
 """
+logger = logging.getLogger(__name__)
 
 
 class Trainer:
@@ -41,7 +44,12 @@ class Trainer:
         return loss
 
     def _run_epoch(self, epoch):
+        # training
+        self.model.train()
         batch_size = len(next(iter(self.train_dataloader))[0])
+        logger.info('this is training:')
+        logger.info(
+            f'[GPU: {self.gpu_id}] Epoch: {epoch} | Batchsize: {batch_size} | Steps: {len(self.train_dataloader)}')
         print(f'[GPU: {self.gpu_id}] Epoch: {epoch} | Batchsize: {batch_size} | Steps: {len(self.train_dataloader)}')
         self.train_dataloader.sampler.set_epoch(epoch)
 
@@ -52,7 +60,14 @@ class Trainer:
 
             # 输出loss
             if self.gpu_id == 0:
+                logger.info(f"loss:{loss.item():.3f}")
+
                 print(f"loss:{loss.item():.3f}")
+
+        # evl
+        # self.model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
+        self.model.eval()
+        evaling(self.model)
 
     def train(self, max_epoch: int):
         for epoch in tqdm(range(max_epoch)):

@@ -9,10 +9,10 @@
 
 目录结构
 ```
-├── data
+├── data # 需自己创建
     │   train.txt # 训练数据集
     │   vocab.txt # 词表
-├── model # 模型保存文件夹
+├── model # 模型保存文件夹 需自己创建
     │   model_gpt.py # 标准注意力GPT
     │   model_gpt_linear_att.py # 线性意力GPT
     └── ...

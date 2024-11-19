@@ -222,8 +222,8 @@ class GPT_Model(nn.Module):
 
             random_list = [i for i, times in zip(topk_idx_list, topk_weight_list) for j in range(times)]
             pre = random.choice(random_list)
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=device)], dim=-1)
-
+            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
+            # print(pre)
             if pre == 2:
                 break
         return x[0]
