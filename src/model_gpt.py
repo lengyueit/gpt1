@@ -160,7 +160,6 @@ class GPT_Model(nn.Module):
     """
     GPT1 模型架构
     """
-
     def __init__(self, vob_len):
         super().__init__()
         self.decoder = Decoder(vob_len)
@@ -171,7 +170,6 @@ class GPT_Model(nn.Module):
     def forward(self, x, y=None):
         decoder_out = self.decoder(x)
         pre = self.cls(decoder_out)
-
         if y is not None:
             loss = self.loss_fn(pre.reshape(-1, pre.shape[-1]), y.reshape(-1))
             return loss

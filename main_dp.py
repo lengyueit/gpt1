@@ -4,7 +4,7 @@ from src.model_gpt_linear_att import GPT_Model as GPT_Model_Linear
 from tqdm import tqdm
 import torch.nn as nn
 from utils import *
-from data_loader import get_loader
+from data_loader import get_loader_dp
 
 """
 DP
@@ -43,7 +43,7 @@ def training_dp():
     已废弃
     :return:
     """
-    train_dataloader = get_loader(all_data, word_2_index)
+    train_dataloader = get_loader_dp(all_data, word_2_index)
 
     # model
     if arg.model == "softmaxAtt":

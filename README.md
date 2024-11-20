@@ -20,7 +20,8 @@
 │   config.py # 配置文件
 │   data_loader.py 
 │   evaluation.py 
-│   main.py  # 主训练脚本
+│   main.py  # 主训练脚本，DDP方式（分布式数据并行）
+│   main_dp.py  # 训练脚本，DP方式（数据并行）
 │   trainer.py
 │   utils.py  
 │   README.md 
@@ -29,14 +30,22 @@
 ```
 
 # 训练脚本
-```shell
+```shell 
+# DDP方式
 torchrun --nproc-per-node=3 main.py --batch_size=128
 ```
 --nproc-per-node为可用显卡数 \
 --batch_size根据显存大小调整
 
+```shell 
+# DP方式
+python3 main_dp.py --batch_size=128
+```
+--batch_size根据显存大小调整
+
+
 ## Contact
 
-If you have any questions, please feel free to contact the authors. 
+If you have any questions, please feel free to contact me. 
 
 Yu Guo: [guoyugy@stu.scu.edu.cn](guoyugy@stu.scu.edu.cn)

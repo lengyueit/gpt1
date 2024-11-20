@@ -7,7 +7,7 @@ import torch.distributed as dist
 from tqdm import tqdm
 import os
 import logging
-from evaluation import evaling
+from inference import evaling
 
 """
 Trainer 训练器
