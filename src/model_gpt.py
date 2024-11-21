@@ -106,7 +106,7 @@ class GPT_Model(nn.Module):
         self.decoder = Decoder(vob_len)
 
         self.cls = nn.Linear(arg.hidden_layer_state, vob_len)
-        self.loss_fn = nn.CrossEntropyLoss()
+        self.loss_fn = nn.CrossEntropyLoss(reduction='none')
 
     def forward(self, x, y=None):
         decoder_out = self.decoder(x)

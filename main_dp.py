@@ -3,6 +3,7 @@ import torch.nn as nn
 from utils import *
 from data_loader import get_loader_dp
 from src.model_gpt import GPT_Model
+from inference import Inference
 
 """
 DP
@@ -27,15 +28,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 world_size = torch.cuda.device_count()
 
 logger = logging.getLogger(__name__)
-
-def evaling(model, inputs="你好\n"):
-    input_idx = [word_2_index.get(i, 1) if i != "\n" else word_2_index["<sep>"] for i in inputs]
-    input_idx = torch.tensor([input_idx], device=device)
-    model_out = model.predict_circle_search(input_idx)
-    model_out = [index_2_word[i] for i in model_out]
-    logger.info(model_out)
-    # print("".join(model_out))
-
+logger.info('this is training:')
 
 def training_dp():
     """
@@ -51,7 +44,7 @@ def training_dp():
     # DP
     if world_size > 1:
         device_ids = [0, 1, 2]
-        model = nn.DataParallel(model, device_ids=device_ids, output_device=0)
+        model = nn.DataParallel(model, device_ids=device_ids)
 
     # 计算模型参数
     model_size = sum([i.numel() for i in model.parameters()])
@@ -78,17 +71,19 @@ def training_dp():
 
         if world_size > 1:
             print(f"loss:{loss.mean().item():.3f}")
+            logger.info(f"loss:{loss.mean().item():.3f}")
         else:
             print(f"loss:{loss.item():.3f}")
+            logger.info(f"loss:{loss.item():.3f}")
+
+        # save model
+        model_save_dir = os.path.join('model', "model_{}.pth".format(i))
+        torch.save(model.state_dict(), model_save_dir)
 
         # evl
-        model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
-        model.eval()
-        evaling(model)
-
-    # save model
-    torch.save(model.state_dict(), os.path.join('model', "model_{}.pth".format(i)))
-
+        generator = Inference(model_dir=model_save_dir)
+        generator.model.eval()
+        generator.generator_one_prompt()
 
 
 if __name__ == '__main__':

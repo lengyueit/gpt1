@@ -1,11 +1,4 @@
-import os
-
-import torch
 from src.model_gpt import GPT_Model
-from src.model_gpt_linear_att import GPT_Model as GPT_Model_Linear
-
-from tqdm import tqdm
-import torch.nn as nn
 from utils import *
 from data_loader import get_loader
 from trainer import Trainer
@@ -33,7 +26,7 @@ vocab_len = len(index_2_word)
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 logger = logging.getLogger(__name__)
-# logger.info('this is training:')
+logger.info('this is training:')
 
 def ddp_setup():
     # nccl：NVIDIA Collective Communication Library
@@ -53,11 +46,7 @@ def training_ddp():
     train_dataloader = get_loader(all_data, word_2_index)
 
     # model
-    if arg.model == "softmaxAtt":
-        model = GPT_Model(vocab_len)
-    elif arg.model == "linearAtt":
-        model = GPT_Model_Linear(vocab_len)
-
+    model = GPT_Model(vocab_len)
     # 计算模型参数
     if os.environ['LOCAL_RANK'] == 0:
         # cuda num
