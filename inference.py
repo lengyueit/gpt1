@@ -1,6 +1,5 @@
 import os
 from src.model_gpt import GPT_Model
-from src.model_gpt_linear_att import GPT_Model as GPT_Model_Linear
 
 import torch
 from utils import *
@@ -98,5 +97,5 @@ def generator_one_prompt(inputs="你好\n"):
 
 
 if __name__ == '__main__':
-    generator_chat()
-    # generator_one_prompt()
+    # generator_chat()
+    generator_one_prompt()

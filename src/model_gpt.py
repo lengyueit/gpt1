@@ -1,10 +1,12 @@
 import random
-
 import torch
 import torch.nn as nn
-# from config import *
 from config import parser
+import sys
 
+# sys.path.append('/src/module')
+from src.module.softmax_att import MultiHeadAttention
+from src.module.linear_att import MultiHeadAttention_Linear
 # define device
 device = "cuda" if torch.cuda.is_available() else "cpu"
 # loading config
@@ -50,71 +52,23 @@ class Feed_Forward(nn.Module):
         return x
 
 
-class MultiHeadAttention(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.Q = nn.Linear(arg.hidden_layer_state, arg.hidden_layer_state)
-        self.K = nn.Linear(arg.hidden_layer_state, arg.hidden_layer_state)
-        self.V = nn.Linear(arg.hidden_layer_state, arg.hidden_layer_state)
-        self.layer_norm = nn.LayerNorm(arg.hidden_layer_state)
-
-        self.head_num = arg.head_num
-
-        self.softmax = nn.Softmax(3)
-
-    def forward(self, x, mask, pad_mask):
-        cur_batch, seq_len, _ = x.shape
-        # copy_x = copy.deepcopy(x)
-        copy_x = x
-
-        # mutil-head attn
-        q = self.Q(x)
-        q = q.reshape(cur_batch, seq_len, self.head_num, -1)
-        q = q.transpose(1, 2)
-
-        k = self.K(x)
-        k = k.reshape(cur_batch, seq_len, self.head_num, -1)
-        k = k.transpose(1, 2)
-
-        v = self.V(x)
-        v = v.reshape(cur_batch, seq_len, self.head_num, -1)
-        v = v.transpose(1, 2)
-
-        # attn
-        # weight = torch.mean(x, dim=-1, keepdim=True)
-
-        # Q @ K的T
-        weight = q @ k.transpose(-1, -2) / torch.sqrt(torch.tensor(arg.hidden_layer_state))
-        # QK点积加上mask
-        weight.masked_fill_(mask, -1e9)
-
-        weight_score = self.softmax(weight)
-
-        # todo 目前的pad 位置的attn score不为0，若全部置为0  自动求导报错
-        # weight_score.masked_fill_(pad_mask, -1e9)
-
-        x = weight_score @ v
-        # mutil-head 还原
-        x = x.transpose(1, 2).reshape(cur_batch, seq_len, -1)
-
-        # 残差
-        x = copy_x + x
-        x = self.layer_norm(x)
-
-        return x
-
-
 class DecoderBlock(nn.Module):
     def __init__(self):
         super().__init__()
         self.attention_block1 = MultiHeadAttention()
+        self.attention_block_linear = MultiHeadAttention_Linear()
+
         # self.attention_block2 = MultiHeadAttention()  # 没用到
         self.feed_forward = Feed_Forward()
 
     def forward(self, x, mask, pad_mask):
-        x = self.attention_block1(x, mask, pad_mask)
+        # model
+        if arg.model == "softmaxAtt":
+            x = self.attention_block1(x, mask, pad_mask)
+        elif arg.model == "linearAtt":
+            x = self.attention_block_linear(x, mask, pad_mask)
 
-        # 原transformers 无mask的多头注意力机制，GPT没有这一层
+        # 原transformers结构中的的非mask的多头注意力机制，GPT结构没有这一层
         # mask = torch.zeros_like(mask, device=device) # 将mask矩阵全部置为0
         # x = self.attention_block2(x, mask)
 
@@ -125,7 +79,6 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
     """transformer decoder 部分"""
-
     def __init__(self, vob_len):
         super().__init__()
         self.embedding = EmbeddingLayer(vob_len)
@@ -135,21 +88,8 @@ class Decoder(nn.Module):
     def forward(self, x):
         emb = self.embedding(x)  # word embedding
 
-        cur_batch, seq_len = x.shape  # [batch_size, seq_length]
-
-        # 获取 pad mask
-        pad_mask = get_pad_mask(x)  # [batch_size, seq_length, 1]
-
-        # pad_mask 拆头
-        pad_mask = pad_mask.unsqueeze(1)  # 升维 [batch_size ,1, seq_length, 1]
-        pad_mask = pad_mask.expand(cur_batch, 1, seq_len, seq_len)  # [batch_size,1, seq_length, seq_length]
-        pad_mask = pad_mask.repeat(1, arg.head_num, 1, 1)  # [batch_size,attn_head_num, seq_length, seq_length]
-
-        # look ahead masks
-        look_ahead_mask = torch.triu(torch.ones_like(pad_mask), 1).to(
-            x.device)  # [batch_size,attn_head_num, seq_length, seq_length] 每一个头都为相同的下三角矩阵
-
-        mask = (pad_mask + look_ahead_mask) >= 1
+        # 获取 mask
+        mask, pad_mask = get_mask(x)  # [batch_size, seq_length, 1]
 
         for layer in self.layers:
             out = layer(emb, mask, pad_mask)
@@ -160,6 +100,7 @@ class GPT_Model(nn.Module):
     """
     GPT1 模型架构
     """
+
     def __init__(self, vob_len):
         super().__init__()
         self.decoder = Decoder(vob_len)
@@ -227,10 +168,23 @@ class GPT_Model(nn.Module):
         return x[0]
 
 
-def get_pad_mask(x):
+def get_mask(x):
     """
-    pad mask
+    get mask and pad_mask
     """
+    cur_batch, seq_len = x.shape  # [batch_size, seq_length]
     padding_position = (x == 0)  # 将PAD置为PAD
     padding_position = torch.unsqueeze(padding_position, dim=-1)  # 升维
-    return padding_position
+
+    # pad_mask 拆头
+    pad_mask = padding_position.unsqueeze(1)  # 升维 [batch_size ,1, seq_length, 1]
+    pad_mask = pad_mask.expand(cur_batch, 1, seq_len, seq_len)  # [batch_size,1, seq_length, seq_length]
+    pad_mask = pad_mask.repeat(1, arg.head_num, 1, 1)  # [batch_size,attn_head_num, seq_length, seq_length]
+
+    # look ahead masks
+    look_ahead_mask = torch.triu(torch.ones_like(pad_mask), 1).to(
+        x.device)  # [batch_size,attn_head_num, seq_length, seq_length] 每一个头都为相同的下三角矩阵
+
+    mask = (pad_mask + look_ahead_mask) >= 1
+
+    return mask, pad_mask

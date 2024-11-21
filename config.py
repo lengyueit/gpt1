@@ -14,12 +14,10 @@ parser.add_argument("--train_data_file_src", default=os.path.join("./data", "tra
                     type=str)
 parser.add_argument("--train_vocab", default=os.path.join("./data", "vocab.txt"), help="词表目录",
                     type=str)
-parser.add_argument("--seed", default=8888, help="random seed", type=int)
+parser.add_argument("--seed", default=1024, help="random seed", type=int)
 
 
 parser.add_argument("--model", default="softmaxAtt", help="预训练模型", type=str)
-# parser.add_argument("--local_rank", default=0, help="gpu rank", type=int)
-
 parser.add_argument("--log_dir", type=str, default=os.path.join('.', 'log'), help="log_dir")
 
 # model para
