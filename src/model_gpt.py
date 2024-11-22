@@ -7,8 +7,7 @@ import sys
 # sys.path.append('/src/module')
 from src.module.softmax_att import MultiHeadAttention
 from src.module.linear_att import MultiHeadAttention_Linear
-# define device
-device = "cuda" if torch.cuda.is_available() else "cpu"
+
 # loading config
 arg = parser.parse_args()
 
@@ -106,7 +105,7 @@ class GPT_Model(nn.Module):
         self.decoder = Decoder(vob_len)
 
         self.cls = nn.Linear(arg.hidden_layer_state, vob_len)
-        self.loss_fn = nn.CrossEntropyLoss(reduction='none')
+        self.loss_fn = nn.CrossEntropyLoss(reduction='none', ignore_index=0)
 
     def forward(self, x, y=None):
         decoder_out = self.decoder(x)
@@ -122,7 +121,7 @@ class GPT_Model(nn.Module):
             pre = self.forward(x)
             pre = torch.argmax(pre, dim=-1)
             pre = int(pre[0][-1])
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=device)], dim=-1)
+            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
 
             if pre == 2:
                 break
@@ -161,8 +160,9 @@ class GPT_Model(nn.Module):
 
             random_list = [i for i, times in zip(topk_idx_list, topk_weight_list) for j in range(times)]
             pre = random.choice(random_list)
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
-            # print(pre)
+            pre = torch.tensor([[pre]], dtype=x.dtype, device=x.device)
+
+            x = torch.cat([x, pre], dim=-1)
             if pre == 2:
                 break
         return x[0]

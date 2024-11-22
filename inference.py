@@ -6,16 +6,20 @@ from utils import *
 from config import parser
 
 """
-Inference code for Our models
+Inference code
 """
 
 
+# loading hyper-para
+# arg = parser.parse_args()
+
 class Inference:
-    def __init__(self, model_dir = os.path.join('model', "model_9.pth")):
+    def __init__(self, model_dir=os.path.join('model', "model_9.pth")):
         # loading hyper-para
         self.arg = parser.parse_args()
         # device
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        # self.device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        self.device = "cpu"
 
         # load data
         self.all_data = read_data(arg.train_data_file_src, arg.training_sample_num)
@@ -25,7 +29,7 @@ class Inference:
         # model
         self.model = GPT_Model(self.vocab_len)
         # eval
-        self.model.load_state_dict(torch.load(model_dir, map_location=self.device), strict=False)
+        self.model.load_state_dict(torch.load(model_dir, map_location=self.device, weights_only=True), strict=False)
         self.model.eval()
 
     def generator_chat(self):
@@ -70,7 +74,6 @@ class Inference:
             print("history:{}".format(history))
             print("Chatbot: {}".format(history[-1]))
 
-
     def generator_one_prompt(self, inputs="你好\n"):
         input_idx = []
 
@@ -93,8 +96,11 @@ class Inference:
         result_text = "".join(model_out)
         print("Chatbot: {}".format(result_text))
 
+        return result_text
+
 
 if __name__ == '__main__':
-    generator = Inference()
+    model_dir = os.path.join('model', "model_{}.pth".format(0))
+    generator = Inference(model_dir)
     # generator_chat()
-    generator.generator_one_prompt()
+    generator.generator_one_prompt("骑来沈阳我带你飞")
