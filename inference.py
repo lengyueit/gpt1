@@ -1,9 +1,8 @@
-import os
 from src.model_gpt import GPT_Model
 
-import torch
 from utils import *
 from config import parser
+import gradio as gr
 
 """
 Inference code
@@ -74,11 +73,19 @@ class Inference:
             print("history:{}".format(history))
             print("Chatbot: {}".format(history[-1]))
 
-    def generator_one_prompt(self, inputs="你好\n"):
+    def generator_one_prompt(self, inputs, history):
+        history_texts = []
+        for one_history in history:
+            for i in one_history:
+                history_texts.append(i)
+        history_texts.append(inputs.strip())
+        print(history_texts)
+        # 拼装历史对话
         input_idx = []
+        for sentence in history_texts:
+            input_idx.extend([self.word_2_index.get(i, 1) for i in sentence])
+            input_idx.extend([self.word_2_index["<sep>"]])
 
-        input_idx.extend([self.word_2_index.get(i, 1) for i in inputs.strip()])
-        input_idx.extend([self.word_2_index["<sep>"]])
         input_idx = torch.tensor([input_idx], device=self.device)
 
         # method 1 贪婪搜索
@@ -94,13 +101,18 @@ class Inference:
         model_out = [self.index_2_word[i] for i in model_out]
 
         result_text = "".join(model_out)
-        print("Chatbot: {}".format(result_text))
-
-        return result_text
+        # print("Chatbot: {}".format(result_text))
+        result_text = result_text.split("<sep>")
+        return result_text[-2]
 
 
 if __name__ == '__main__':
-    model_dir = os.path.join('model', "model_{}.pth".format(0))
+    model_dir = os.path.join('model', "model_{}.pth".format(9))
     generator = Inference(model_dir)
-    # generator_chat()
-    generator.generator_one_prompt("骑来沈阳我带你飞")
+    # generator.generator_chat()
+    # generator.generator_one_prompt("小迷妹上线了？")
+
+    gr.ChatInterface(title="KDDE GPT mini",
+                     description="GPT mini 模型，目前仅支持中文聊天",
+                     fn=generator.generator_one_prompt
+                     ).queue(default_concurrency_limit=10).launch(share=True)

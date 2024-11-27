@@ -1,3 +1,5 @@
+import time
+
 from config import parser
 import numpy as np
 import random
@@ -37,7 +39,7 @@ def set_seed(seed):
 
 def init_logger(args):
     """init logger"""
-    current_path = os.path.join(args.log_dir, f"{str(args.lr)}-{str(args.epoch)}-output.log")
+    current_path = os.path.join(args.log_dir, f"{str(time.asctime())}-{str(args.lr)}-{str(args.epoch)}-output.log")
 
     if os.path.exists(current_path):
         os.remove(current_path)

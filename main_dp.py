@@ -3,7 +3,7 @@ import torch.nn as nn
 from utils import *
 from data_loader import get_loader_dp
 from src.model_gpt import GPT_Model
-from inference import Inference
+from torch.utils.tensorboard import SummaryWriter
 
 """
 DP
@@ -31,6 +31,9 @@ vocab_len = len(index_2_word)
 device = "cuda" if torch.cuda.is_available() else "cpu"
 world_size = torch.cuda.device_count()
 
+writer = SummaryWriter("tensorboard_log")
+
+
 def training_dp():
     """
     已废弃
@@ -52,36 +55,44 @@ def training_dp():
     logger.info(f"model_size:{model_size / 1000 / 1000} M")
     print(f"model_size:{model_size / 1000 / 1000} M")
 
-    opt = torch.optim.Adam(model.parameters(), lr=arg.lr)
+    opt = torch.optim.AdamW(model.parameters(), lr=arg.lr)
 
-    for i in range(arg.epoch):
-        model.train()
-        for inputs, outputs in tqdm(train_dataloader):
-            inputs = inputs.to(device)
-            outputs = outputs.to(device)
+    try:
+        for i in range(arg.epoch):
+            model.train()
+            step = 0
+            for inputs, outputs in tqdm(train_dataloader):
+                step = step + 1
+                inputs = inputs.to(device)
+                outputs = outputs.to(device)
 
-            loss = model(inputs, outputs)
+                loss = model(inputs, outputs)
+                # 采取loss的非归约输出，需要计算手动计算平均梯度
+                loss = loss.mean()
+                loss.backward()
 
-            # 采取loss的非归约输出，需要计算手动计算平均梯度
-            loss = loss.mean()
-            loss.backward()
-            opt.step()
-            opt.zero_grad()
+                opt.step()
+                opt.zero_grad()
 
-            print(f"epoch:{i} loss:{loss.item():.3f}")
-            logger.info(f"epoch:{i} loss:{loss.item():.3f}")
+                # print(f"epoch:{i} loss:{loss.item():.3f}")
+                logger.info(f"epoch:{i} loss:{loss.item():.3f}")
+                writer.add_scalar(f"epoch:{i} training loss", loss.item(), step)
+            # writer.close()
 
-        # save model
-        model_save_dir = os.path.join('model', "model_{}.pth".format(i))
-        torch.save(model.state_dict(), model_save_dir)
+            # save model
+            model_save_dir = os.path.join('model', "model_{}.pth".format(i))
+            torch.save(model.state_dict(), model_save_dir)
 
-        # evl
-        # logger.info('this is evl:')
-        # generator = Inference(model_dir=model_save_dir)
-        # generator.model.eval()
-        # generator.generator_one_prompt("骑来沈阳我带你飞")
+            # evl
+            # logger.info('this is evl:')
+            # generator = Inference(model_dir=model_save_dir)
+            # generator.model.eval()
+            # generator.generator_one_prompt("骑来沈阳我带你飞")
+
+    except Exception as e:
+        logger.info(f"{e}")
+        print(e)
 
 
 if __name__ == '__main__':
     training_dp()
-

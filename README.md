@@ -1,4 +1,5 @@
-# GPT1结构的简单复现
+# GPT mini
+模型架构参考GPT1论文中的标准GPT结构 [论文链接](https://hayate-lab.com/wp-content/uploads/2023/05/43372bfa750340059ad87ac8e538c53b.pdf)
 
 训练数据：
 多轮对话50w条
@@ -43,6 +44,9 @@ python3 main_dp.py --batch_size=128
 ```
 --batch_size根据显存大小调整
 
+
+## Todo
+fix a bug of DP and DDP
 
 ## Contact
 

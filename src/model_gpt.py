@@ -54,10 +54,10 @@ class Feed_Forward(nn.Module):
 class DecoderBlock(nn.Module):
     def __init__(self):
         super().__init__()
-        self.attention_block1 = MultiHeadAttention()
-        self.attention_block_linear = MultiHeadAttention_Linear()
+        self.attention_block1 = MultiHeadAttention()  # softmax att
+        self.attention_block_linear = MultiHeadAttention_Linear()  # linear att
 
-        # self.attention_block2 = MultiHeadAttention()  # 没用到
+        # self.attention_block2 = MultiHeadAttention()
         self.feed_forward = Feed_Forward()
 
     def forward(self, x, mask, pad_mask):
@@ -68,8 +68,8 @@ class DecoderBlock(nn.Module):
             x = self.attention_block_linear(x, mask, pad_mask)
 
         # 原transformers结构中的的非mask的多头注意力机制，GPT结构没有这一层
-        # mask = torch.zeros_like(mask, device=device) # 将mask矩阵全部置为0
-        # x = self.attention_block2(x, mask)
+        # mask = torch.zeros_like(mask, device=x.device)  # 将mask矩阵全部置为0
+        # x = self.attention_block2(x, mask, pad_mask)
 
         x = self.feed_forward(x)
 
@@ -78,6 +78,7 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
     """transformer decoder 部分"""
+
     def __init__(self, vob_len):
         super().__init__()
         self.embedding = EmbeddingLayer(vob_len)
@@ -85,10 +86,10 @@ class Decoder(nn.Module):
         self.layers = nn.ModuleList([DecoderBlock() for _ in range(arg.decoder_layer_num)])
 
     def forward(self, x):
-        emb = self.embedding(x)  # word embedding
-
         # 获取 mask
         mask, pad_mask = get_mask(x)  # [batch_size, seq_length, 1]
+
+        emb = self.embedding(x)  # word embedding
 
         for layer in self.layers:
             out = layer(emb, mask, pad_mask)
@@ -97,7 +98,7 @@ class Decoder(nn.Module):
 
 class GPT_Model(nn.Module):
     """
-    GPT1 模型架构
+    GPT 模型架构
     """
 
     def __init__(self, vob_len):
@@ -117,7 +118,7 @@ class GPT_Model(nn.Module):
             return pre
 
     def predict_greedy_search(self, x):
-        while True:
+        for i in range(50):
             pre = self.forward(x)
             pre = torch.argmax(pre, dim=-1)
             pre = int(pre[0][-1])
@@ -133,14 +134,15 @@ class GPT_Model(nn.Module):
             _, indexes = torch.sort(pre)
             topk_list = indexes[0][-1].tolist()[::-1][:arg.top_k]
             pre = random.choice(topk_list)
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=device)], dim=-1)
+            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
 
             if pre == 2:
                 break
         return x[0]
 
     def predict_circle_search(self, x):
-        while True:
+        # while True:
+        for i in range(50):
             pre = self.forward(x)
 
             # 根据每个字预测的词表进行排序
