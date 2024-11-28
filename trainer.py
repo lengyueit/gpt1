@@ -7,12 +7,14 @@ import torch.distributed as dist
 from tqdm import tqdm
 import os
 import logging
-from inference import evaling
+from torch.utils.tensorboard import SummaryWriter
 
 """
 Trainer 训练器
 """
 logger = logging.getLogger(__name__)
+
+writer = SummaryWriter("tensorboard_log")
 
 
 class Trainer:
@@ -30,6 +32,8 @@ class Trainer:
 
     def _run_batch(self, xs, ys):
         loss = self.model(xs, ys)
+        # 采取loss的非归约输出，需要计算手动计算平均梯度
+        loss = loss.mean()
         loss.backward()
 
         # 同步梯度，确保参数更新的一致性
@@ -50,10 +54,12 @@ class Trainer:
         logger.info('this is training:')
         logger.info(
             f'[GPU: {self.gpu_id}] Epoch: {epoch} | Batchsize: {batch_size} | Steps: {len(self.train_dataloader)}')
-        print(f'[GPU: {self.gpu_id}] Epoch: {epoch} | Batchsize: {batch_size} | Steps: {len(self.train_dataloader)}')
+        # print(f'[GPU: {self.gpu_id}] Epoch: {epoch} | Batchsize: {batch_size} | Steps: {len(self.train_dataloader)}')
         self.train_dataloader.sampler.set_epoch(epoch)
 
+        step = 0
         for xs, ys in self.train_dataloader:
+            step = step + 1
             xs = xs.to(self.gpu_id)
             ys = ys.to(self.gpu_id)
             loss = self._run_batch(xs, ys)
@@ -61,17 +67,16 @@ class Trainer:
             # 输出loss
             if self.gpu_id == 0:
                 logger.info(f"loss:{loss.item():.3f}")
-
-                print(f"loss:{loss.item():.3f}")
+                writer.add_scalar(f"epoch:{epoch} training loss", loss.item(), step)
+                # print(f"loss:{loss.item():.3f}")
 
         # evl
         # self.model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
-        self.model.eval()
-        evaling(self.model)
 
     def train(self, max_epoch: int):
         for epoch in tqdm(range(max_epoch)):
             self._run_epoch(epoch)
 
         # save model
-        torch.save(self.model.state_dict(), os.path.join('model', "model_{}.pth".format(epoch)))
+        model_save_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(epoch))
+        torch.save(self.model.module.state_dict(), model_save_dir)

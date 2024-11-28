@@ -29,9 +29,10 @@ class Inference:
         self.model = GPT_Model(self.vocab_len)
         # eval
         self.model.load_state_dict(torch.load(model_dir, map_location=self.device, weights_only=True), strict=False)
-        self.model.eval()
 
     def generator_chat(self):
+        self.model.eval()
+
         # 记录历史信息
         history = []
 
@@ -68,16 +69,18 @@ class Inference:
             result_text = "".join(model_out)
 
             # 更新history
-            history = result_text.split("<sep>")[:-1]
+            history = result_text.split("<sep>")
 
             print("history:{}".format(history))
             print("Chatbot: {}".format(history[-1]))
 
-    def generator_one_prompt(self, inputs, history):
+    def generator_chat_gradio(self, inputs, history):
+        self.model.eval()
+
         history_texts = []
         for one_history in history:
             for i in one_history:
-                history_texts.append(i)
+                history_texts.append(i.strip())
         history_texts.append(inputs.strip())
         print(history_texts)
         # 拼装历史对话
@@ -103,16 +106,18 @@ class Inference:
         result_text = "".join(model_out)
         # print("Chatbot: {}".format(result_text))
         result_text = result_text.split("<sep>")
-        return result_text[-2]
+        return result_text[-1]
+
+    def chat_by_gradio(self):
+        gr.ChatInterface(title="KDDE GPT mini",
+                         description="GPT mini 模型，目前仅支持中文聊天",
+                         fn=self.generator_chat_gradio
+                         ).queue(default_concurrency_limit=10).launch(share=True)
 
 
 if __name__ == '__main__':
-    model_dir = os.path.join('model', "model_{}.pth".format(9))
+    model_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(9))
+
     generator = Inference(model_dir)
     # generator.generator_chat()
-    # generator.generator_one_prompt("小迷妹上线了？")
-
-    gr.ChatInterface(title="KDDE GPT mini",
-                     description="GPT mini 模型，目前仅支持中文聊天",
-                     fn=generator.generator_one_prompt
-                     ).queue(default_concurrency_limit=10).launch(share=True)
+    generator.chat_by_gradio()

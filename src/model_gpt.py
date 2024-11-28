@@ -122,10 +122,10 @@ class GPT_Model(nn.Module):
             pre = self.forward(x)
             pre = torch.argmax(pre, dim=-1)
             pre = int(pre[0][-1])
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
-
             if pre == 2:
                 break
+            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
+
         return x[0]
 
     def predict_random_search(self, x):
@@ -134,10 +134,11 @@ class GPT_Model(nn.Module):
             _, indexes = torch.sort(pre)
             topk_list = indexes[0][-1].tolist()[::-1][:arg.top_k]
             pre = random.choice(topk_list)
-            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
-
             if pre == 2:
                 break
+
+            x = torch.cat([x, torch.tensor([[pre]], dtype=x.dtype, device=x.device)], dim=-1)
+
         return x[0]
 
     def predict_circle_search(self, x):
@@ -162,11 +163,11 @@ class GPT_Model(nn.Module):
 
             random_list = [i for i, times in zip(topk_idx_list, topk_weight_list) for j in range(times)]
             pre = random.choice(random_list)
-            pre = torch.tensor([[pre]], dtype=x.dtype, device=x.device)
-
-            x = torch.cat([x, pre], dim=-1)
             if pre == 2:
                 break
+
+            pre = torch.tensor([[pre]], dtype=x.dtype, device=x.device)
+            x = torch.cat([x, pre], dim=-1)
         return x[0]
 
 

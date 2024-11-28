@@ -43,12 +43,14 @@ def training_dp():
 
     # model
     model = GPT_Model(vocab_len)
-    model.to(device)
 
     # DP
     if world_size > 1:
-        device_ids = [0, 1, 2]
-        model = nn.DataParallel(model, device_ids=device_ids)
+        # device_ids = [0, 1, 2]
+        # model = nn.DataParallel(model, device_ids=device_ids, output_device=device_ids[0])
+        model = nn.DataParallel(model)
+
+    model.to(device)
 
     # 计算模型参数
     model_size = sum([i.numel() for i in model.parameters()])
@@ -80,14 +82,8 @@ def training_dp():
             # writer.close()
 
             # save model
-            model_save_dir = os.path.join('model', "model_{}.pth".format(i))
-            torch.save(model.state_dict(), model_save_dir)
-
-            # evl
-            # logger.info('this is evl:')
-            # generator = Inference(model_dir=model_save_dir)
-            # generator.model.eval()
-            # generator.generator_one_prompt("骑来沈阳我带你飞")
+            model_save_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(i))
+            torch.save(model.module.state_dict(), model_save_dir)
 
     except Exception as e:
         logger.info(f"{e}")

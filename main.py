@@ -14,7 +14,7 @@ arg = parser.parse_args()
 
 # set random seed
 # utils.save_para2file(args)
-set_seed(arg.seed)
+set_seed(arg.seed + int(os.environ['LOCAL_RANK']))
 init_logger(arg)
 
 # load data
@@ -23,7 +23,7 @@ index_2_word, word_2_index = get_word_2_index(arg.train_vocab)
 vocab_len = len(index_2_word)
 
 # device
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 logger = logging.getLogger(__name__)
 logger.info('this is training:')
@@ -47,6 +47,7 @@ def training_ddp():
 
     # model
     model = GPT_Model(vocab_len)
+
     # 计算模型参数
     if os.environ['LOCAL_RANK'] == 0:
         # cuda num
@@ -59,7 +60,7 @@ def training_ddp():
         model.train()
 
     # 优化器
-    opt = torch.optim.Adam(model.parameters(), lr=arg.lr)
+    opt = torch.optim.AdamW(model.parameters(), lr=arg.lr)
 
     # training
     trainer = Trainer(model=model, optimizer=opt, train_dataloader=train_dataloader)

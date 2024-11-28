@@ -58,7 +58,7 @@ def get_loader_dp(all_data, word_2_index, mode='train'):
     return data_loader
 
 
-def get_loader(all_data, word_2_index, mode='train'):
+def get_loader(all_data, word_2_index):
     _dataset = MyDataset(all_data, word_2_index)
     data_loader = DataLoader(_dataset, arg.batch_size, shuffle=False, pin_memory=True,
                              collate_fn=_dataset.pro_data, sampler=DistributedSampler(_dataset))
