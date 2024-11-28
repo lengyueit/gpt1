@@ -5,4 +5,6 @@ log
 visualize
 demo
 tensorboard_log
-.gradio
+.gradio/
+.idea/
+.DS_Store

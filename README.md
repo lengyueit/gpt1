@@ -1,13 +1,13 @@
 # GPT mini
 模型架构参考GPT1论文中的标准GPT结构 [论文链接](https://hayate-lab.com/wp-content/uploads/2023/05/43372bfa750340059ad87ac8e538c53b.pdf)
 
-已复现模块：
-1、字符编码、位置编码
-2、多头自注意力机制
-3、Decoder Layer堆叠
-4、FFN
-5、残差网络
-6、Padding Mask、Look-ahead Mask
+已复现模块： \
+1、字符编码、位置编码\
+2、多头自注意力机制\
+3、Decoder Layer堆叠\
+4、FFN\
+5、残差网络\
+6、Padding Mask、Look-ahead Mask\
 
 训练数据：
 多轮对话50w条
@@ -41,7 +41,7 @@
 
 # 训练脚本
 ```shell 
-# DDP方式
+# DDP方式(推荐使用)
 torchrun --nproc-per-node=3 main.py --batch_size=128
 ```
 --nproc-per-node为可用显卡数 \
