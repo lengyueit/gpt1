@@ -34,10 +34,9 @@ world_size = torch.cuda.device_count()
 writer = SummaryWriter("tensorboard_log")
 
 
-def training_dp():
+if __name__ == '__main__':
     """
-    已废弃
-    :return:
+    不推荐，推荐使用main.py 进行训练
     """
     train_dataloader = get_loader_dp(all_data, word_2_index)
 
@@ -82,13 +81,9 @@ def training_dp():
             # writer.close()
 
             # save model
-            model_save_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(i))
+            model_save_dir = os.path.join('model', "GPTmini-clm-chat-0.1-{}.pth".format(i))
             torch.save(model.module.state_dict(), model_save_dir)
 
     except Exception as e:
         logger.info(f"{e}")
         print(e)
-
-
-if __name__ == '__main__':
-    training_dp()

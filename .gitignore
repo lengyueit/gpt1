@@ -7,4 +7,5 @@ demo
 tensorboard_log
 .gradio/
 .idea/
-.DS_Store
+.DS_Store/
+.gitignore

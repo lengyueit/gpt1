@@ -2,12 +2,13 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.multiprocessing as mp
-from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
 from tqdm import tqdm
 import os
 import logging
 from torch.utils.tensorboard import SummaryWriter
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 
 """
 Trainer 训练器
@@ -58,7 +59,7 @@ class Trainer:
         self.train_dataloader.sampler.set_epoch(epoch)
 
         step = 0
-        for xs, ys in self.train_dataloader:
+        for xs, ys in tqdm(self.train_dataloader):
             step = step + 1
             xs = xs.to(self.gpu_id)
             ys = ys.to(self.gpu_id)
@@ -74,9 +75,9 @@ class Trainer:
         # self.model.load_state_dict(torch.load(os.path.join('model', "model_9.pth")), strict=False)
 
     def train(self, max_epoch: int):
-        for epoch in tqdm(range(max_epoch)):
+        for epoch in range(max_epoch):
             self._run_epoch(epoch)
 
-        # save model
-        model_save_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(epoch))
-        torch.save(self.model.module.state_dict(), model_save_dir)
+            # save model
+            model_save_dir = os.path.join('model', "GPTmini-clm-chat-0.1-{}.pth".format(epoch))
+            torch.save(self.model.module.state_dict(), model_save_dir)

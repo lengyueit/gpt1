@@ -116,6 +116,7 @@ class Inference:
 
 
 if __name__ == '__main__':
+    # model_dir = os.path.join('model', "GPTmini-clm-chat-0.1-{}.pth".format(9))
     model_dir = os.path.join('model', "GPTmini-0.1-{}.pth".format(9))
 
     generator = Inference(model_dir)

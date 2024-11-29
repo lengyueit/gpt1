@@ -28,6 +28,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 logger = logging.getLogger(__name__)
 logger.info('this is training:')
 
+
 def ddp_setup():
     # nccl：NVIDIA Collective Communication Library
     # 分布式情况下的，gpus 间通信
@@ -35,11 +36,12 @@ def ddp_setup():
     torch.cuda.set_device(int(os.environ['LOCAL_RANK']))
 
 
-def training_ddp():
+if __name__ == '__main__':
     """
     利用 torchrun 启动
-    :return:
     """
+    print("Current local id is: {}".format(os.environ['LOCAL_RANK']))
+
     ddp_setup()
 
     # loader dataloader
@@ -67,7 +69,3 @@ def training_ddp():
     trainer.train(arg.epoch)
 
     destroy_process_group()
-
-if __name__ == '__main__':
-    print("Current local id is: {}".format(os.environ['LOCAL_RANK']))
-    training_ddp()

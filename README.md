@@ -1,5 +1,5 @@
 # GPT mini
-模型架构参考GPT1论文中的标准GPT结构 [论文链接](https://hayate-lab.com/wp-content/uploads/2023/05/43372bfa750340059ad87ac8e538c53b.pdf)
+模型架构参考GPT1(Causal Language Model)论文中的标准GPT结构 [论文链接](https://hayate-lab.com/wp-content/uploads/2023/05/43372bfa750340059ad87ac8e538c53b.pdf)
 
 已复现模块： \
 1、字符编码、位置编码\
